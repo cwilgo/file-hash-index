@@ -9,3 +9,10 @@ This tool is in the very early stages of development. Essentially I wanted a too
 1. Tool to create and update a database of file hashes
 2. Learn .Net Core
 3. Learn Visual Studio Code
+4. Learn how to package apps for linux distribution
+
+## Next Steps
+
+- Complete command line options - currently nothing but help exists
+- Add support for SHA1 hashes, possibly others
+- Add support to store hashes in an actual database, such as sqlite
