@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace md5db
+namespace FileHashIndex
 {
     class Program
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("md5db v0.1");
+            Console.WriteLine("file-hash-index v0.1");
 
             var options = new Options(args);
             if (options.DisplayHelp)

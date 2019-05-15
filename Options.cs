@@ -1,6 +1,6 @@
 using System;
 
-namespace md5db
+namespace FileHashIndex
 {
     public class Options
     {
