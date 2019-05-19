@@ -4,6 +4,15 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
     <RuntimeFrameworkVersion>2.2.3</RuntimeFrameworkVersion>
+    <RootNamespace>FileHashIndex</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>Wil Tetz</Authors>
+    <Company>Alpine Computence</Company>
+    <PackageProjectUrl>https://github.com/cwilgo/file-hash-index</PackageProjectUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

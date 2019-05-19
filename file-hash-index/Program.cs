@@ -8,7 +8,7 @@ namespace FileHashIndex
 {
     class Program
     {
-        static void Main(string[] args)
+        static async System.Threading.Tasks.Task Main(string[] args)
         {
             Console.WriteLine("file-hash-index v0.1");
 
@@ -20,64 +20,60 @@ namespace FileHashIndex
             }
 
             Console.WriteLine($"Processing directory: {options.BasePath}");
-            var list = new SortedDictionary<string, string>();
-            DateTime updateDate = DateTime.MinValue;
 
-            if (File.Exists(Path.Combine(options.BasePath, options.HashFilename)))
-            {
-                Console.WriteLine($"Found hash database: {options.HashFilename}");
-                updateDate = File.GetLastWriteTime(Path.Combine(options.BasePath, options.HashFilename));
-                using (var hashdb = new StreamReader(Path.Combine(options.BasePath, options.HashFilename)))
-                {
-                    while (!hashdb.EndOfStream)
-                    {
-                        string line = hashdb.ReadLine();
-                        list.Add(line.Substring(34), line.Substring(0, 32));
-                    }
-                }
-            }
+            Data.IDatastore data;
+            if (options.DatastoreType == DatastoreType.Md5SumFile)
+                data = new Data.Md5SumFileDatastore();
+            else if (options.DatastoreType == DatastoreType.Sqlite)
+                data = new Data.SQLiteDatastore();
+            else
+                throw new Exception("No datastore set.");
+            await data.Init(Path.Combine(options.BasePath, options.HashFilename));
 
-            if (list.Count > 0)
+
+            long count = await data.Count();
+            if (count > 0)
             {
-                Console.WriteLine($"Read {list.Count} items from hash database.");
+                Console.WriteLine($"Read {count} items from hash database.");
             }
 
             var files = Directory.GetFiles(options.BasePath, "*", SearchOption.AllDirectories);
             int newFileCount = 0;
             int modifiedFileCount = 0;
 
-            using (var md5 = MD5.Create())
+            foreach (var file in files)
             {
-                foreach (var file in files)
+                if (Path.GetFileName(file) != options.HashFilename)
                 {
-                    if (Path.GetFileName(file) != options.HashFilename)
+                    string path = "." + Path.DirectorySeparatorChar + System.IO.Path.GetRelativePath(options.BasePath, file);
+                    var hash = await data.GetHashInfo(path);
+                    if (hash == null)
                     {
-                        string path = "." + Path.DirectorySeparatorChar + System.IO.Path.GetRelativePath(options.BasePath, file);
-                        if (!list.ContainsKey(path))
+                        // New Hash
+                        var fi = new FileInfo(file);
+                        hash = new Data.HashInfo() {
+                            Path = path,
+                            Size = fi.Length,
+                            ModifiedDate = fi.LastWriteTime,
+                            Hash = CalculateMD5Hash(file),
+                        };
+                        newFileCount++;
+                        Console.WriteLine($"{hash.Hash} *{hash.Path}");
+                        await data.UpdateHashInfo(hash);
+                    }
+                    else
+                    {
+                        // Update existing hash if necessary
+                        var fi = new FileInfo(file);
+                        if (fi.LastWriteTime > hash.ModifiedDate
+                            || (hash.Size >= 0 && hash.Size != fi.Length))
                         {
-                            list.Add(path, string.Empty);
-                            //newFileCount++;
-                        }
-                        if (string.IsNullOrEmpty(list.GetValueOrDefault(path, null)) ||
-                            File.GetLastWriteTime(file) > updateDate
-                            )
-                        {
-                            using (var stream = File.OpenRead(file))
-                            {
-                                string hash = BitConverter.ToString(md5.ComputeHash(stream))
-                                    .Replace("-", string.Empty)
-                                    .ToLowerInvariant();
-                                if (list.GetValueOrDefault(path, string.Empty) != hash)
-                                {
-                                    if (string.IsNullOrEmpty(list.GetValueOrDefault(path, string.Empty)))
-                                        newFileCount++;
-                                    else
-                                        modifiedFileCount++;
-                                    list.Remove(path);
-                                    list.Add(path, hash);
-                                    Console.WriteLine($"{hash} *{path}");
-                                }
-                            }
+                            hash.Size = fi.Length;
+                            hash.ModifiedDate = fi.LastWriteTime;
+                            hash.Hash = CalculateMD5Hash(file);
+                            modifiedFileCount++;
+                            Console.WriteLine($"{hash.Hash} *{hash.Path}");
+                            await data.UpdateHashInfo(hash);
                         }
                     }
                 }
@@ -85,14 +81,7 @@ namespace FileHashIndex
             Console.WriteLine($"Found {newFileCount} new files.");
             Console.WriteLine($"Updated {modifiedFileCount} files.");
 
-            string outputPath = Path.Combine(options.BasePath, options.HashFilename);
-            using (var output = new StreamWriter(outputPath))
-            {
-                foreach (var item in list)
-                {
-                    output.WriteLine($"{item.Value} *{item.Key}");
-                }
-            }
+            await data.SaveAndClose();
         }
 
         private static void DisplayHelp()
@@ -100,7 +89,20 @@ namespace FileHashIndex
             Console.WriteLine("\nUSAGE: md5db [OPTIONS]\n");
             Console.WriteLine("Options:");
             Console.WriteLine("  -h, --help     Display Help");
+            Console.WriteLine("  -sqlite        Use SQLite database to store hashes");
             Console.WriteLine();
+        }
+
+        private static string CalculateMD5Hash(string fullPath)
+        {
+            using (var md5 = MD5.Create())
+            using (var stream = File.OpenRead(fullPath))
+            {
+                string hash = BitConverter.ToString(md5.ComputeHash(stream))
+                    .Replace("-", string.Empty)
+                    .ToLowerInvariant();
+                return hash;
+            }
         }
     }
 }

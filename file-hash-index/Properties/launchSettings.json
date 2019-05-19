@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "file-hash-index": {
+      "commandName": "Project",
+      "workingDirectory": "H:\\Nextcloud\\GPS"
+    }
+  }
+}
